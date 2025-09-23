@@ -1,9 +1,12 @@
 package com.zulbiasa.jomsolatv2.watchface
 
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Rect
+import android.content.Context
+import android.graphics.*
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.os.BatteryManager
 import android.util.Log
 import android.view.SurfaceHolder
 import androidx.wear.watchface.*
@@ -21,12 +24,34 @@ class MyWatchFaceService : WatchFaceService() {
     override fun createUserStyleSchema(): UserStyleSchema = UserStyleSchema(emptyList())
     private val prayerStore by lazy { PrayerTimesDataStore(applicationContext) }
 
+    private var stepCount = 0
+    private var sensorManager: SensorManager? = null
+    private var stepSensor: Sensor? = null
+
+    private val stepListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            event?.let {
+                if (it.sensor.type == Sensor.TYPE_STEP_COUNTER) {
+                    stepCount = it.values[0].toInt()
+                }
+            }
+        }
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
+
     override suspend fun createWatchFace(
         surfaceHolder: SurfaceHolder,
         watchState: WatchState,
         complicationSlotsManager: ComplicationSlotsManager,
         currentUserStyleRepository: CurrentUserStyleRepository
     ): WatchFace {
+
+        // Initialize sensor manager for step counter
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        stepSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+        stepSensor?.let {
+            sensorManager?.registerListener(stepListener, it, SensorManager.SENSOR_DELAY_UI)
+        }
 
         // --- Paints ---
         val timePaint = Paint().apply {
@@ -62,13 +87,44 @@ class MyWatchFaceService : WatchFaceService() {
             textSize = 24f
         }
 
+        // New paints for battery and steps
+        val batteryPaint = Paint().apply {
+            color = Color.WHITE
+            isAntiAlias = true
+            textAlign = Paint.Align.LEFT
+            textSize = 24f
+        }
+        val batteryIconPaint = Paint().apply {
+            color = Color.WHITE
+            isAntiAlias = true
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+        }
+        val batteryFillPaint = Paint().apply {
+            color = Color.GREEN
+            isAntiAlias = true
+            style = Paint.Style.FILL
+        }
+        val stepsPaint = Paint().apply {
+            color = Color.WHITE
+            isAntiAlias = true
+            textAlign = Paint.Align.RIGHT
+            textSize = 24f
+        }
+        val stepsIconPaint = Paint().apply {
+            color = Color.parseColor("#FF9800") // Orange color for steps
+            isAntiAlias = true
+            textAlign = Paint.Align.RIGHT
+            textSize = 20f
+        }
+
         val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         val dateFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy")
         val malaysiaZone = ZoneId.of("Asia/Kuala_Lumpur")
 
         // --- SharedAssets ---
         class PrayerSharedAssets : Renderer.SharedAssets {
-            var prayerTimes: Map<String, Long> = mapOf() // simpan epoch time
+            var prayerTimes: Map<String, Long> = mapOf()
             var locationName: String = "Unknown"
 
             override fun onDestroy() {}
@@ -76,7 +132,6 @@ class MyWatchFaceService : WatchFaceService() {
             suspend fun loadFromDataStore() {
                 try {
                     val stored = prayerStore.readPrayerTimes().first()
-                    // convert string epoch ke Long
                     prayerTimes = stored.mapNotNull {
                         val value = it.value.toLongOrNull()
                         if (it.key != "location" && value != null) it.key to value else null
@@ -123,10 +178,7 @@ class MyWatchFaceService : WatchFaceService() {
 
                 val nowMinutes = now.hour * 60 + now.minute
 
-                // Current = solat terakhir yang dah berlalu
                 val currentPrayer = prayerMinutes.lastOrNull { it.second <= nowMinutes }?.first ?: order.last()
-
-                // Next = solat pertama yang akan datang
                 val nextPrayer = prayerMinutes.firstOrNull { it.second > nowMinutes }?.first ?: order.first()
 
                 val nextTime = Instant.ofEpochSecond(prayers[nextPrayer] ?: 0L)
@@ -134,6 +186,74 @@ class MyWatchFaceService : WatchFaceService() {
                     .format(timeFormatter)
 
                 return Triple(currentPrayer, nextPrayer, nextTime)
+            }
+
+            private fun getBatteryLevel(): Int {
+                val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+                return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            }
+
+            private fun drawBatteryIcon(canvas: Canvas, x: Float, y: Float, level: Int) {
+                // Draw battery outline
+                val batteryRect = RectF(x, y - 15, x + 40, y + 5)
+                canvas.drawRoundRect(batteryRect, 2f, 2f, batteryIconPaint)
+
+                // Draw battery terminal
+                canvas.drawRect(x + 40, y - 8, x + 43, y - 2, batteryIconPaint)
+
+                // Draw battery fill based on level
+                val fillWidth = (36 * level / 100).toFloat()
+                if (fillWidth > 0) {
+                    val fillColor = when {
+                        level <= 20 -> Color.RED
+                        level <= 50 -> Color.YELLOW
+                        else -> Color.GREEN
+                    }
+                    batteryFillPaint.color = fillColor
+                    canvas.drawRect(x + 2, y - 13, x + 2 + fillWidth, y + 3, batteryFillPaint)
+                }
+
+                // Draw percentage text
+                batteryPaint.textAlign = Paint.Align.LEFT
+                batteryPaint.textSize = 20f
+                batteryPaint.isFakeBoldText = true
+                canvas.drawText("$level%", x + 5, y + 32, batteryPaint)
+            }
+
+            private fun drawStepsIcon(canvas: Canvas, x: Float, y: Float) {
+                /*// Draw simple footstep icon using path
+                val path = Path()
+                val iconX = x - 100
+
+                // Simple footstep shape
+                path.moveTo(iconX, y - 10)
+                path.lineTo(iconX + 5, y - 5)
+                path.lineTo(iconX + 5, y + 5)
+                path.lineTo(iconX - 5, y + 5)
+                path.lineTo(iconX - 5, y - 5)
+                path.close()
+
+                val iconPaint = Paint().apply {
+                    color = Color.parseColor("#FF9800")
+                    style = Paint.Style.FILL
+                    isAntiAlias = true
+                }
+                canvas.drawPath(path, iconPaint)*/
+
+                // Draw step count
+                val formattedSteps = when {
+                    stepCount >= 10000 -> String.format("%.1fk", stepCount / 1000.0)
+                    stepCount >= 1000 -> String.format("%dk", stepCount / 1000)
+                    else -> stepCount.toString()
+                }
+                stepsPaint.textAlign = Paint.Align.RIGHT
+                stepsPaint.textSize = 30f
+                canvas.drawText(formattedSteps, x - 20, y - 10, stepsPaint)
+
+                // Draw "steps" label
+                stepsIconPaint.textAlign = Paint.Align.RIGHT
+                stepsIconPaint.textSize = 20f
+                canvas.drawText("steps", x - 20, y + 10, stepsIconPaint)
             }
 
             override fun render(
@@ -149,9 +269,12 @@ class MyWatchFaceService : WatchFaceService() {
                 val (currentPrayer, nextPrayer, nextTime) =
                     computeCurrentAndNext(zonedDateTime, sharedAssets.prayerTimes)
 
-                Log.d("MyWatchFace", "Current time: ${zonedDateTime.format(timeFormatter)}")
-                Log.d("MyWatchFace", "Current prayer: $currentPrayer")
-                Log.d("MyWatchFace", "Next prayer: $nextPrayer at $nextTime")
+                // Battery indicator on the left
+                val batteryLevel = getBatteryLevel()
+                drawBatteryIcon(canvas, 20f, cy - 55f, batteryLevel)
+
+                // Steps indicator on the right
+                drawStepsIcon(canvas, bounds.width() - 20f, cy - 40f)
 
                 // Current prayer
                 canvas.drawText(currentPrayer, cx, cy - 120f, currentPrayerPaint)
@@ -178,9 +301,15 @@ class MyWatchFaceService : WatchFaceService() {
 
             override fun onDestroy() {
                 super.onDestroy()
+                sensorManager?.unregisterListener(stepListener)
             }
         }
 
         return WatchFace(WatchFaceType.DIGITAL, renderer)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        sensorManager?.unregisterListener(stepListener)
     }
 }

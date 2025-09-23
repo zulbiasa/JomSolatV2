@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND"/>
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <!-- Optional: WAKE_LOCK if you need to keep the screen on or CPU awake -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -21,6 +24,7 @@
     <!-- gyro and compass feature might be redundant if using accel+mag, but good to have if you expect specific hardware -->
     <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false"/>
     <uses-feature android:name="android.hardware.sensor.compass" android:required="false"/>
+
 
     <uses-feature android:name="android.hardware.type.watch" />
 

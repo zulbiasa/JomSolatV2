@@ -67,12 +67,16 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
-    // Watch Face API
+
+    // Core Watch Face
     implementation("androidx.wear.watchface:watchface:1.2.1")
     implementation("androidx.wear.watchface:watchface-style:1.2.1")
+// Complications
     implementation("androidx.wear.watchface:watchface-complications-data:1.2.1")
     implementation("androidx.wear.watchface:watchface-complications-rendering:1.2.1")
+    implementation("androidx.wear.watchface:watchface-complications-data-source:1.2.1")
+    implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
-    implementation("androidx.datastore:datastore-preferences:1.1.0")
+    implementation("androidx.datastore:datastore-preferences:1.1.7")
 }

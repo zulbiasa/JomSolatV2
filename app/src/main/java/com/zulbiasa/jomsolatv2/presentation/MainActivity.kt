@@ -3,6 +3,7 @@ package com.zulbiasa.jomsolatv2.presentation
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Geocoder
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.TextView
@@ -29,9 +30,14 @@ class MainActivity : AppCompatActivity() {
     val formatter = DateTimeFormatter.ofPattern("HH:mm")
 
     private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-            if (isGranted) getLocationAndFetchPrayerTimes()
-            else textView.text = "Permission denied. Cannot fetch location."
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            permissions.entries.forEach {
+                Log.d("Permissions", "${it.key} = ${it.value}")
+            }
+            // Call your function if location is granted
+            if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
+                getLocationAndFetchPrayerTimes()
+            }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,16 +46,44 @@ class MainActivity : AppCompatActivity() {
 
         textView = findViewById(R.id.textView)
 
-        checkLocationPermission()
+        // Check and request permissions
+        checkAndRequestPermissions()
     }
 
-    private fun checkLocationPermission() {
-        when {
-            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                    == PackageManager.PERMISSION_GRANTED -> getLocationAndFetchPrayerTimes()
-            else -> requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+    private fun checkAndRequestPermissions() {
+        // Step 1: Permissions always safe to request together
+        val safePermissions = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.BODY_SENSORS,
+            Manifest.permission.ACTIVITY_RECOGNITION
+        )
+
+        val notGrantedSafe = safePermissions.filter {
+            ActivityCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
+
+        if (notGrantedSafe.isNotEmpty()) {
+            Log.d("Permissions", "Requesting safe: ${notGrantedSafe.joinToString()}")
+            requestPermissionLauncher.launch(notGrantedSafe.toTypedArray())
+            return
+        }
+
+        // Step 2: BODY_SENSORS_BACKGROUND (Android 12+ only)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS_BACKGROUND)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                Log.d("Permissions", "Requesting BODY_SENSORS_BACKGROUND")
+                requestPermissionLauncher.launch(arrayOf(Manifest.permission.BODY_SENSORS_BACKGROUND))
+                getLocationAndFetchPrayerTimes()
+            }
+        }
+
+        // All permissions granted
+        getLocationAndFetchPrayerTimes()
     }
+
+
 
     fun epochToHHmm(seconds: Long): String {
         return Instant.ofEpochSecond(seconds)
