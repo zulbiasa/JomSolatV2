@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.wear.widget.BoxInsetLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/swipeRefreshLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/black">
@@ -9,8 +10,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center"
-        android:text="Fetching prayer times..."
+        android:text="Fetching prayer times...\n\nSwipe down to refresh"
         android:textColor="@android:color/white"
         android:textSize="14sp" />
 
-</androidx.wear.widget.BoxInsetLayout>
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

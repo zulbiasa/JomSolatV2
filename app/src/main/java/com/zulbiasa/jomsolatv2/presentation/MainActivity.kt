@@ -1,16 +1,20 @@
 package com.zulbiasa.jomsolatv2.presentation
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.gms.location.LocationServices
 import com.zulbiasa.jomsolatv2.R
 import com.zulbiasa.jomsolatv2.data.PrayerTimesDataStore
@@ -25,6 +29,7 @@ import java.time.format.DateTimeFormatter
 class MainActivity : AppCompatActivity() {
 
     private lateinit var textView: TextView
+    private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private val prayerStore by lazy { PrayerTimesDataStore(this) }
     val malaysiaZone = ZoneId.of("Asia/Kuala_Lumpur") // timezone Malaysia
     val formatter = DateTimeFormatter.ofPattern("HH:mm")
@@ -40,11 +45,32 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_refresh -> {
+                // Call your function to refresh prayer times
+                getLocationAndFetchPrayerTimes()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         textView = findViewById(R.id.textView)
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
+
+        swipeRefreshLayout.setOnRefreshListener {
+            getLocationAndFetchPrayerTimes()
+        }
 
         // Check and request permissions
         checkAndRequestPermissions()
@@ -91,21 +117,28 @@ class MainActivity : AppCompatActivity() {
             .format(formatter)
     }
 
+    @SuppressLint("SetTextI18n")
     private fun getLocationAndFetchPrayerTimes() {
+        swipeRefreshLayout.isRefreshing = true
+
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         if (ActivityCompat.checkSelfPermission(
                 this, Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED) return
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            swipeRefreshLayout.isRefreshing = false
+            return
+        }
 
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
             if (location == null) {
                 textView.text = "Failed to get location."
+                swipeRefreshLayout.isRefreshing = false
                 return@addOnSuccessListener
             }
 
             val lat = location.latitude
             val lon = location.longitude
-
             val geocoder = Geocoder(this, Locale.getDefault())
             val addresses = geocoder.getFromLocation(lat, lon, 1)
             val locationName = if (!addresses.isNullOrEmpty()) {
@@ -118,7 +151,9 @@ class MainActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 try {
                     val response = RetrofitClient.api.getPrayerTimesByGps(lat, lon)
-                    val today = response.prayers.firstOrNull { it.day == Calendar.getInstance().get(Calendar.DAY_OF_MONTH) }
+                    val today = response.prayers.firstOrNull {
+                        it.day == Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+                    }
                     today?.let {
                         val prayerTimes = mapOf(
                             "Fajr" to it.fajr.toString(),
@@ -128,22 +163,26 @@ class MainActivity : AppCompatActivity() {
                             "Isyak" to it.isha.toString(),
                             "locationName" to locationName
                         )
-                        Log.d("MainActivity", it.toString())
                         prayerStore.savePrayerTimes(prayerTimes)
 
                         textView.text = """
-                            Location:
-                            $locationName
-                            
-                            Fajr: ${epochToHHmm(prayerTimes["Fajr"]!!.toLong())}
-                            Zohor: ${epochToHHmm(prayerTimes["Zohor"]!!.toLong())}
-                            Asar: ${epochToHHmm(prayerTimes["Asar"]!!.toLong())}
-                            Maghrib: ${epochToHHmm(prayerTimes["Maghrib"]!!.toLong())}
-                            Isyak: ${epochToHHmm(prayerTimes["Isyak"]!!.toLong())}
-                        """.trimIndent()
+                        ↓↓↓
+                        Swipe down to refresh
+                        
+                        Location:
+                        $locationName
+                        
+                        Fajr: ${epochToHHmm(prayerTimes["Fajr"]!!.toLong())}
+                        Zohor: ${epochToHHmm(prayerTimes["Zohor"]!!.toLong())}
+                        Asar: ${epochToHHmm(prayerTimes["Asar"]!!.toLong())}
+                        Maghrib: ${epochToHHmm(prayerTimes["Maghrib"]!!.toLong())}
+                        Isyak: ${epochToHHmm(prayerTimes["Isyak"]!!.toLong())}
+                    """.trimIndent()
                     }
                 } catch (e: Exception) {
                     textView.text = "API Error: ${e.message}"
+                } finally {
+                    swipeRefreshLayout.isRefreshing = false // stop spinner HERE
                 }
             }
         }
