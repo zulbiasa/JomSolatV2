@@ -27,17 +27,30 @@ class MyWatchFaceService : WatchFaceService() {
     private var stepCount = 0
     private var sensorManager: SensorManager? = null
     private var stepSensor: Sensor? = null
+    private var baselineSteps = 0
+    private var currentDate: String = ""
 
     private val stepListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent?) {
             event?.let {
                 if (it.sensor.type == Sensor.TYPE_STEP_COUNTER) {
-                    stepCount = it.values[0].toInt()
+                    val today = ZonedDateTime.now(ZoneId.of("Asia/Kuala_Lumpur"))
+                        .format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+
+                    if (today != currentDate) {
+                        // New day → reset
+                        currentDate = today
+                        baselineSteps = it.values[0].toInt()
+                    }
+
+                    stepCount = it.values[0].toInt() - baselineSteps
+                    if (stepCount < 0) stepCount = 0
                 }
             }
         }
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }
+
 
     override suspend fun createWatchFace(
         surfaceHolder: SurfaceHolder,
@@ -112,6 +125,13 @@ class MyWatchFaceService : WatchFaceService() {
             textSize = 24f
         }
         val stepsIconPaint = Paint().apply {
+            color = Color.parseColor("#FF9800") // Orange color for steps
+            isAntiAlias = true
+            textAlign = Paint.Align.RIGHT
+            textSize = 20f
+        }
+
+        val flame = Paint().apply {
             color = Color.parseColor("#FF9800") // Orange color for steps
             isAntiAlias = true
             textAlign = Paint.Align.RIGHT
@@ -214,47 +234,39 @@ class MyWatchFaceService : WatchFaceService() {
                 }
 
                 // Draw percentage text
-                batteryPaint.textAlign = Paint.Align.LEFT
+                batteryPaint.textAlign = Paint.Align.CENTER
                 batteryPaint.textSize = 20f
                 batteryPaint.isFakeBoldText = true
-                canvas.drawText("$level%", x + 5, y + 32, batteryPaint)
+                canvas.drawText("$level%", x + 22, y + 32, batteryPaint)
             }
 
             private fun drawStepsIcon(canvas: Canvas, x: Float, y: Float) {
-                /*// Draw simple footstep icon using path
-                val path = Path()
-                val iconX = x - 100
 
-                // Simple footstep shape
-                path.moveTo(iconX, y - 10)
-                path.lineTo(iconX + 5, y - 5)
-                path.lineTo(iconX + 5, y + 5)
-                path.lineTo(iconX - 5, y + 5)
-                path.lineTo(iconX - 5, y - 5)
-                path.close()
 
-                val iconPaint = Paint().apply {
-                    color = Color.parseColor("#FF9800")
-                    style = Paint.Style.FILL
-                    isAntiAlias = true
-                }
-                canvas.drawPath(path, iconPaint)*/
+                // 🔥 Steps text (positioned to the right of the flame, with LEFT alignment)
+                val textOffsetX = 25f // extra gap so it won’t overlap flame
+                val textX = x + textOffsetX
+                val textY = y + 35f
 
-                // Draw step count
                 val formattedSteps = when {
                     stepCount >= 10000 -> String.format("%.1fk", stepCount / 1000.0)
                     stepCount >= 1000 -> String.format("%dk", stepCount / 1000)
                     else -> stepCount.toString()
                 }
-                stepsPaint.textAlign = Paint.Align.RIGHT
-                stepsPaint.textSize = 30f
-                canvas.drawText(formattedSteps, x - 20, y - 10, stepsPaint)
 
-                // Draw "steps" label
+                stepsPaint.textAlign = Paint.Align.LEFT
+                stepsPaint.textSize = 28f
+                canvas.drawText(formattedSteps, textX - 30, textY, stepsPaint)
+
+                flame.textAlign = Paint.Align.LEFT
+                flame.textSize = 25f
+                canvas.drawText("\uD83D\uDD25", textX - 15, textY + 20f, flame)
+
                 stepsIconPaint.textAlign = Paint.Align.RIGHT
-                stepsIconPaint.textSize = 20f
-                canvas.drawText("steps", x - 20, y + 10, stepsIconPaint)
+                stepsIconPaint.textSize = 18f
+                canvas.drawText("steps", textX - 15, textY + 25f, stepsIconPaint)
             }
+
 
             override fun render(
                 canvas: Canvas,
@@ -274,7 +286,7 @@ class MyWatchFaceService : WatchFaceService() {
                 drawBatteryIcon(canvas, 20f, cy - 55f, batteryLevel)
 
                 // Steps indicator on the right
-                drawStepsIcon(canvas, bounds.width() - 20f, cy - 40f)
+                drawStepsIcon(canvas, bounds.width() - 55f, cy - 85f)
 
                 // Current prayer
                 canvas.drawText(currentPrayer, cx, cy - 120f, currentPrayerPaint)
