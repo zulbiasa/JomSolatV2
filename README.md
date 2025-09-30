@@ -80,7 +80,7 @@ GPS -> PrayerTimesDataStore -> WatchFaceRenderer -> CanvasRenderer2 -> Display
 ### Steps
 
 ```bash
-git clone https://github.com/<your-username>/JomSolat.git
+git clone https://github.com/zulbiasa/JomSolat.git
 cd JomSolat
 ```
 
