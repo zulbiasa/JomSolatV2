@@ -46,7 +46,7 @@ It is optimized for **performance, accuracy, and simplicity**, providing glancea
 
 | Watch Face                                         | Prayer Details                                         |
 | -------------------------------------------------- | ------------------------------------------------------ |
-| ![Watch Face](https://github.com/zulbiasa/JomSolatV2/blob/main/app/src/main/res/drawable/watchface_preview.png) | ![Prayer Details](https://github.com/zulbiasa/JomSolatV2/blob/main/app/src/main/res/drawable/app_preview.png) |
+| ![Watch Face](https://github.com/zulbiasa/JomSolatV2/blob/main/app/src/main/res/drawable/preview_circular.png) | ![Prayer Details](https://github.com/zulbiasa/JomSolatV2/blob/main/app/src/main/res/drawable/app_preview.png) |
 
 
 ---
