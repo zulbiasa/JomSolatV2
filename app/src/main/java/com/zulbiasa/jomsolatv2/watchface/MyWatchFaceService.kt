@@ -254,9 +254,10 @@ class MyWatchFaceService : WatchFaceService() {
                     else -> stepCount.toString()
                 }
 
-                stepsPaint.textAlign = Paint.Align.LEFT
-                stepsPaint.textSize = 28f
-                canvas.drawText(formattedSteps, textX - 30, textY, stepsPaint)
+                stepsPaint.textAlign = Paint.Align.RIGHT
+                stepsPaint.textSize = 25f
+                stepsPaint.isFakeBoldText = true
+                canvas.drawText(formattedSteps, textX - 14, textY, stepsPaint)
 
                 flame.textAlign = Paint.Align.LEFT
                 flame.textSize = 25f
